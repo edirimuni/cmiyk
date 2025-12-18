@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sleek Tag</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #1a1a1a; touch-action: none; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        canvas { display: block; }
+        .glass-panel {
+            background: rgba(30, 30, 30, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+        /* Custom scrollbar for chat */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 3px; }
+        
+        /* Mobile controls */
+        .joystick-zone { position: absolute; bottom: 50px; left: 50px; width: 120px; height: 120px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.1); display: none; }
+        .joystick-knob { width: 50px; height: 50px; background: rgba(255,255,255,0.3); border-radius: 50%; position: absolute; top: 35px; left: 35px; pointer-events: none; transition: transform 0.05s; }
+        
+        @media (max-width: 768px) {
+            .joystick-zone { display: block; }
+        }
+
+        .squircle {
+            border-radius: 25%; /* Squircle shape */
+        }
+    </style>
+</head>
+<body class="text-white select-none">
+
+    <!-- APP CONTAINER -->
+    <div id="app" class="relative w-full h-full">
+        
+        <!-- MAIN MENU -->
+        <div id="menu-screen" class="absolute inset-0 flex items-center justify-center z-50 bg-neutral-900 transition-opacity duration-500">
+            <div class="glass-panel p-8 rounded-3xl w-full max-w-md mx-4 text-center">
+                <h1 class="text-5xl font-bold mb-2 tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">TAG.IO</h1>
+                <p class="text-gray-400 mb-8 text-sm uppercase tracking-widest">Minimalist Multiplayer</p>
+
+                <!-- Customizer -->
+                <div class="mb-8 p-4 bg-black/20 rounded-2xl">
+                    <p class="text-xs text-gray-500 mb-2 uppercase font-bold">Customize Appearance</p>
+                    <div class="flex justify-center items-center gap-6 mb-4">
+                        <div id="preview-player" class="w-20 h-20 rounded-[20px] shadow-2xl relative overflow-hidden transition-all duration-300">
+                            <div id="preview-top" class="absolute top-0 left-0 w-full h-1/2 bg-blue-500"></div>
+                            <div id="preview-bottom" class="absolute bottom-0 left-0 w-full h-1/2 bg-indigo-600"></div>
+                            <!-- Eyes -->
+                            <div class="absolute top-1/4 left-1/4 w-2 h-2 bg-white rounded-full opacity-80"></div>
+                            <div class="absolute top-1/4 right-1/4 w-2 h-2 bg-white rounded-full opacity-80"></div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 text-left">
+                        <div>
+                            <label class="text-xs text-gray-400">Top Color</label>
+                            <input type="color" id="color-top" value="#3b82f6" class="w-full h-8 rounded cursor-pointer bg-transparent border-none">
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-400">Bottom Color</label>
+                            <input type="color" id="color-btm" value="#4f46e5" class="w-full h-8 rounded cursor-pointer bg-transparent border-none">
+                        </div>
+                    </div>
+                    <input type="text" id="username" placeholder="Enter Nickname" class="mt-4 w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 transition-colors text-center font-bold" maxlength="10">
+                </div>
+
+                <!-- Actions -->
+                <div class="space-y-3">
+                    <button id="btn-host" class="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl font-bold text-lg shadow-lg hover:shadow-blue-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all">Host Game</button>
+                    <div class="flex gap-2">
+                        <input type="text" id="join-code" placeholder="Enter Game Code" class="flex-1 bg-neutral-800 border border-neutral-700 rounded-xl px-4 focus:outline-none focus:border-purple-500 font-mono text-center uppercase">
+                        <button id="btn-join" class="px-6 py-4 bg-neutral-700 hover:bg-neutral-600 rounded-xl font-bold transition-all">Join</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- GAME HUD -->
+        <div id="game-hud" class="hidden absolute inset-0 pointer-events-none z-40">
+            <!-- Top Bar -->
+            <div class="absolute top-0 left-0 w-full p-4 flex justify-between items-start">
+                <div class="glass-panel px-4 py-2 rounded-full flex items-center gap-3">
+                    <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                    <span id="room-code-display" class="font-mono text-sm opacity-75">CODE: ----</span>
+                </div>
+                
+                <div class="glass-panel px-6 py-3 rounded-2xl flex flex-col items-center">
+                    <span id="timer-display" class="text-3xl font-black font-mono tracking-wider">03:00</span>
+                    <span class="text-[10px] uppercase text-gray-400 tracking-widest">Time Remaining</span>
+                </div>
+
+                <div class="glass-panel px-4 py-2 rounded-full pointer-events-auto cursor-pointer hover:bg-white/10 transition" id="btn-leave">
+                    <i class="fa-solid fa-right-from-bracket text-red-400"></i>
+                </div>
+            </div>
+
+            <!-- IT Status -->
+            <div id="it-status" class="absolute top-24 left-1/2 transform -translate-x-1/2 glass-panel px-6 py-2 rounded-full hidden">
+                <span class="font-bold text-yellow-400 animate-pulse uppercase tracking-widest text-sm">You are IT!</span>
+            </div>
+
+            <!-- Chat Overlay -->
+            <div class="absolute bottom-6 left-6 w-80 pointer-events-auto flex flex-col gap-2 max-h-[40vh]">
+                <div id="chat-messages" class="flex-1 overflow-y-auto flex flex-col gap-1 p-2 mask-image-gradient">
+                    <!-- Messages go here -->
+                </div>
+                <form id="chat-form" class="flex gap-2 opacity-50 focus-within:opacity-100 transition-opacity">
+                    <input type="text" id="chat-input" placeholder="Type..." class="flex-1 bg-black/50 border border-white/10 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-white/30 backdrop-blur-sm">
+                </form>
+            </div>
+            
+            <!-- Mobile Joystick (Visual Only, Logic handled in JS) -->
+            <div id="joystick-zone" class="joystick-zone pointer-events-auto">
+                <div id="joystick-knob" class="joystick-knob"></div>
+            </div>
+        </div>
+
+        <!-- CANVAS -->
+        <canvas id="game-canvas" class="w-full h-full block bg-[#121212]"></canvas>
+
+        <!-- GAME OVER MODAL -->
+        <div id="game-over-screen" class="hidden absolute inset-0 bg-black/90 z-50 flex items-center justify-center backdrop-blur-sm">
+            <div class="text-center">
+                <h2 class="text-6xl font-black mb-4 text-white">GAME OVER</h2>
+                <p id="winner-text" class="text-2xl text-gray-300 mb-8">Time's Up!</p>
+                <button id="btn-menu" class="px-8 py-3 bg-white text-black font-bold rounded-full hover:scale-110 transition-transform">Back to Menu</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- FIREBASE MODULES -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, getDoc, onSnapshot, updateDoc, serverTimestamp, query, orderBy, limit, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- CONFIGURATION ---
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+        // --- GAME STATE ---
+        let currentUser = null;
+        let gameId = null;
+        let isHost = false;
+        let unsubscribeGame = null;
+        let unsubscribePlayers = null;
+        let unsubscribeChat = null;
+        
+        // Game Constants
+        const GAME_DURATION = 180; // seconds
+        const MAP_SIZE = 2000;
+        const PLAYER_SIZE = 40;
+        const PLAYER_SPEED = 250; // pixels per second
+        const VIEWPORT_LAG = 0.1; // Camera smoothing (0-1)
+        
+        // Local Game Objects
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        let lastTime = 0;
+        let mapObstacles = [];
+        let players = {}; // id -> {x, y, colorTop, colorBtm, isIt, targetX, targetY}
+        let localPlayer = {
+            x: 100, y: 100,
+            vx: 0, vy: 0,
+            colorTop: '#3b82f6', colorBtm: '#4f46e5',
+            name: 'Player',
+            isIt: false
+        };
+        let camera = { x: 0, y: 0 };
+        let gameEndTime = 0;
+        let gameState = 'MENU'; // MENU, PLAYING, GAMEOVER
+
+        // Input State
+        const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowLeft: false, ArrowDown: false, ArrowRight: false };
+        const joystick = { active: false, dx: 0, dy: 0, originX: 0, originY: 0, id: null };
+
+        // --- AUTHENTICATION ---
+        async function initAuth() {
+            // Check for initial auth token if available (from parent environment)
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                try {
+                    // Note: signInWithCustomToken requires the import which we need to add if using it
+                    // For this environment, we'll try anonymous first as it's safer given the import list
+                    // But correctly we should use custom token if provided.
+                    // Since I didn't import signInWithCustomToken above, I will stick to anonymous for simplicity/robustness
+                    // unless strictly required. However, prompt rules say "ALWAYS call signInWithCustomToken".
+                    // I will dynamically import it to fix this oversight.
+                    const { signInWithCustomToken } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } catch (e) {
+                    console.warn("Custom token failed, falling back to anon", e);
+                    await signInAnonymously(auth);
+                }
+            } else {
+                await signInAnonymously(auth);
+            }
+        }
+        
+        initAuth();
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                console.log("Logged in as:", user.uid);
+            }
+        });
+
+        // --- UI HANDLERS ---
+        // Customizer
+        const colorTopIn = document.getElementById('color-top');
+        const colorBtmIn = document.getElementById('color-btm');
+        const previewTop = document.getElementById('preview-top');
+        const previewBtm = document.getElementById('preview-bottom');
+        const nameInput = document.getElementById('username');
+
+        function updatePreview() {
+            previewTop.style.backgroundColor = colorTopIn.value;
+            previewBtm.style.backgroundColor = colorBtmIn.value;
+            localPlayer.colorTop = colorTopIn.value;
+            localPlayer.colorBtm = colorBtmIn.value;
+        }
+        colorTopIn.addEventListener('input', updatePreview);
+        colorBtmIn.addEventListener('input', updatePreview);
+        
+        // Menu Buttons
+        document.getElementById('btn-host').addEventListener('click', hostGame);
+        document.getElementById('btn-join').addEventListener('click', () => {
+            const code = document.getElementById('join-code').value.trim().toUpperCase();
+            if(code) joinGame(code);
+        });
+        document.getElementById('btn-leave').addEventListener('click', leaveGame);
+        document.getElementById('btn-menu').addEventListener('click', () => {
+            document.getElementById('game-over-screen').classList.add('hidden');
+            leaveGame();
+        });
+
+        // Chat
+        document.getElementById('chat-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const input = document.getElementById('chat-input');
+            const text = input.value.trim();
+            if (text && gameId) {
+                addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'games', gameId, 'chat'), {
+                    name: localPlayer.name,
+                    text: text,
+                    timestamp: serverTimestamp()
+                });
+                input.value = '';
+            }
+        });
+
+        // --- GAME LOGIC : NETWORKING ---
+
+        function generateRoomCode() {
+            return Math.random().toString(36).substring(2, 8).toUpperCase();
+        }
+
+        function generateMap() {
+            const obstacles = [];
+            // Border walls
+            // Just conceptual, we handle bounds in collision.
+            // Random blocks
+            for(let i=0; i<30; i++) {
+                obstacles.push({
+                    x: Math.random() * (MAP_SIZE - 200) + 100,
+                    y: Math.random() * (MAP_SIZE - 200) + 100,
+                    w: Math.random() * 100 + 50,
+                    h: Math.random() * 100 + 50
+                });
+            }
+            return obstacles;
+        }
+
+        async function hostGame() {
+            if(!currentUser) return;
+            const code = generateRoomCode();
+            const obstacles = generateMap();
+            
+            localPlayer.name = nameInput.value || 'Player';
+            
+            // Create Game Doc
+            const gameData = {
+                host: currentUser.uid,
+                status: 'WAITING',
+                createdAt: serverTimestamp(),
+                endTime: Date.now() + (GAME_DURATION * 1000),
+                map: JSON.stringify(obstacles),
+                currentIt: currentUser.uid // Host starts as IT
+            };
+
+            // STRICT PATH: artifacts/{appId}/public/data/games/{gameId}
+            await setDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'games', code), gameData);
+            
+            joinGame(code);
+        }
+
+        async function joinGame(code) {
+            if(!currentUser) return;
+            gameId = code;
+            localPlayer.name = nameInput.value || 'Player';
+
+            // Initial Player Data setup
+            // We use a subcollection for players to allow high frequency updates without document contention
+            const playerRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'games', gameId, 'players', currentUser.uid);
+            await setDoc(playerRef, {
+                x: Math.random() * 500 + 100,
+                y: Math.random() * 500 + 100,
+                name: localPlayer.name,
+                colorTop: localPlayer.colorTop,
+                colorBtm: localPlayer.colorBtm,
+                lastSeen: serverTimestamp()
+            });
+
+            // Start Listening
+            subscribeToGame(code);
+            startGameLoop();
+            
+            // UI Switch
+            document.getElementById('menu-screen').classList.add('opacity-0', 'pointer-events-none');
+            document.getElementById('game-hud').classList.remove('hidden');
+            document.getElementById('room-code-display').innerText = `CODE: ${code}`;
+        }
+
+        function subscribeToGame(code) {
+            const gameRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'games', code);
+            
+            // 1. Sync Game State (Timer, Map, Who is IT)
+            unsubscribeGame = onSnapshot(gameRef, (snap) => {
+                if(!snap.exists()) { leaveGame(); return; } // Game deleted
+                const data = snap.data();
+                
+                gameEndTime = data.endTime;
+                
+                // Parse map if loaded for first time
+                if(data.map && mapObstacles.length === 0) {
+                    mapObstacles = JSON.parse(data.map);
+                }
+
+                // Update IT status locally
+                const itId = data.currentIt;
+                
+                // Update players local copy of who is IT
+                Object.keys(players).forEach(pid => {
+                    if(players[pid]) players[pid].isIt = (pid === itId);
+                });
+                if(localPlayer) localPlayer.isIt = (currentUser.uid === itId);
+
+                // Check IT UI
+                const itStatus = document.getElementById('it-status');
+                if(localPlayer.isIt) {
+                    itStatus.classList.remove('hidden');
+                } else {
+                    itStatus.classList.add('hidden');
+                }
+
+            }, (err) => console.error("Game Sync Error", err));
+
+            // 2. Sync Players
+            const playersRef = collection(db, 'artifacts', APP_ID, 'public', 'data', 'games', code, 'players');
+            unsubscribePlayers = onSnapshot(playersRef, (snap) => {
+                snap.docChanges().forEach(change => {
+                    const pid = change.doc.id;
+                    if(pid === currentUser.uid) return; // Ignore self
+
+                    if(change.type === "added" || change.type === "modified") {
+                        const pData = change.doc.data();
+                        if(!players[pid]) {
+                            // New player
+                            players[pid] = { ...pData, currentX: pData.x, currentY: pData.y };
+                        } else {
+                            // Update target for interpolation
+                            players[pid].targetX = pData.x;
+                            players[pid].targetY = pData.y;
+                            players[pid].colorTop = pData.colorTop;
+                            players[pid].colorBtm = pData.colorBtm;
+                            // name, etc.
+                        }
+                    } else if (change.type === "removed") {
+                        delete players[pid];
+                    }
+                });
+            }, (err) => console.error("Player Sync Error", err));
+
+            // 3. Sync Chat
+            const chatRef = query(collection(db, 'artifacts', APP_ID, 'public', 'data', 'games', code, 'chat'), orderBy('timestamp', 'desc'), limit(10));
+            unsubscribeChat = onSnapshot(chatRef, (snap) => {
+                const container = document.getElementById('chat-messages');
+                container.innerHTML = '';
+                const msgs = [];
+                snap.forEach(d => msgs.push(d.data()));
+                msgs.reverse().forEach(msg => {
+                    const div = document.createElement('div');
+                    div.className = "text-xs text-white/90 drop-shadow-md";
+                    div.innerHTML = `<span class="font-bold text-blue-400">${msg.name}:</span> ${msg.text}`;
+                    container.appendChild(div);
+                });
+                container.scrollTop = container.scrollHeight;
+            }, (err) => console.log(err));
+        }
+
+        async function leaveGame() {
+            // Cleanup listeners
+            if(unsubscribeGame) unsubscribeGame();
+            if(unsubscribePlayers) unsubscribePlayers();
+            if(unsubscribeChat) unsubscribeChat();
+            
+            // Reset state
+            gameId = null;
+            players = {};
+            mapObstacles = [];
+            gameState = 'MENU';
+            
+            // UI Reset
+            document.getElementById('menu-screen').classList.remove('opacity-0', 'pointer-events-none');
+            document.getElementById('game-hud').classList.add('hidden');
+            document.getElementById('game-over-screen').classList.add('hidden');
+        }
+
+        // --- GAME LOGIC : ENGINE ---
+
+        function startGameLoop() {
+            gameState = 'PLAYING';
+            lastTime = performance.now();
+            requestAnimationFrame(loop);
+        }
+
+        let lastNetworkUpdate = 0;
+        
+        function loop(timestamp) {
+            if(gameState !== 'PLAYING') return;
+
+            const dt = (timestamp - lastTime) / 1000;
+            lastTime = timestamp;
+
+            update(dt);
+            draw();
+
+            requestAnimationFrame(loop);
+        }
+
+        function update(dt) {
+            // 1. Timer Logic
+            const timeLeft = Math.max(0, Math.ceil((gameEndTime - Date.now())/1000));
+            document.getElementById('timer-display').innerText = new Date(timeLeft * 1000).toISOString().substr(14, 5);
+
+            if(timeLeft <= 0) {
+                gameState = 'GAMEOVER';
+                document.getElementById('game-over-screen').classList.remove('hidden');
+                return;
+            }
+
+            // 2. Input Handling
+            let dx = 0; 
+            let dy = 0;
+
+            // Keyboard
+            if(keys.w || keys.ArrowUp) dy = -1;
+            if(keys.s || keys.ArrowDown) dy = 1;
+            if(keys.a || keys.ArrowLeft) dx = -1;
+            if(keys.d || keys.ArrowRight) dx = 1;
+
+            // Joystick override
+            if(joystick.active) {
+                dx = joystick.dx;
+                dy = joystick.dy;
+            }
+
+            // Normalize
+            if(dx !== 0 || dy !== 0) {
+                const len = Math.sqrt(dx*dx + dy*dy);
+                dx = (dx/len) * PLAYER_SPEED * dt;
+                dy = (dy/len) * PLAYER_SPEED * dt;
+            }
+
+            // 3. Movement & Collision (AABB)
+            const nextX = localPlayer.x + dx;
+            const nextY = localPlayer.y + dy;
+
+            // Map Bounds
+            let canMoveX = true;
+            let canMoveY = true;
+
+            if(nextX < 0 || nextX > MAP_SIZE - PLAYER_SIZE) canMoveX = false;
+            if(nextY < 0 || nextY > MAP_SIZE - PLAYER_SIZE) canMoveY = false;
+
+            // Obstacle Collision
+            for(let obs of mapObstacles) {
+                if(checkRectCollide(nextX, localPlayer.y, PLAYER_SIZE, PLAYER_SIZE, obs.x, obs.y, obs.w, obs.h)) canMoveX = false;
+                if(checkRectCollide(localPlayer.x, nextY, PLAYER_SIZE, PLAYER_SIZE, obs.x, obs.y, obs.w, obs.h)) canMoveY = false;
+            }
+
+            if(canMoveX) localPlayer.x += dx;
+            if(canMoveY) localPlayer.y += dy;
+
+            // 4. Tagging Logic (Client authoritative for the Tagger)
+            // If I am IT, and I touch someone, I tag them.
+            if(localPlayer.isIt) {
+                for(let pid in players) {
+                    const p = players[pid];
+                    // Simple distance check
+                    const dist = Math.hypot((localPlayer.x - p.currentX), (localPlayer.y - p.currentY));
+                    if(dist < PLAYER_SIZE) {
+                        // TAGGED!
+                        console.log("Tagged", pid);
+                        // Optimistic Update
+                        localPlayer.isIt = false; 
+                        // Send to DB (Update Game State)
+                        updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'games', gameId), {
+                            currentIt: pid
+                        }).catch(e => console.error(e));
+                        
+                        // Break to prevent double tagging
+                        break;
+                    }
+                }
+            }
+
+            // 5. Network Sync (Throttle to 10hz)
+            const now = Date.now();
+            if(now - lastNetworkUpdate > 100 && currentUser) {
+                updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'games', gameId, 'players', currentUser.uid), {
+                    x: localPlayer.x,
+                    y: localPlayer.y
+                }).catch(err => {}); // Silent fail is ok for pos updates
+                lastNetworkUpdate = now;
+            }
+
+            // 6. Remote Player Interpolation
+            for(let pid in players) {
+                const p = players[pid];
+                if(p.targetX !== undefined) {
+                    // Simple Lerp
+                    p.currentX = p.currentX + (p.targetX - p.currentX) * 0.1;
+                    p.currentY = p.currentY + (p.targetY - p.currentY) * 0.1;
+                }
+            }
+        }
+
+        function draw() {
+            // Resize Canvas
+            if(canvas.width !== window.innerWidth) canvas.width = window.innerWidth;
+            if(canvas.height !== window.innerHeight) canvas.height = window.innerHeight;
+
+            // Camera Follow (Lerp)
+            // Target camera position: centered on player
+            const targetCamX = localPlayer.x - canvas.width / 2 + PLAYER_SIZE / 2;
+            const targetCamY = localPlayer.y - canvas.height / 2 + PLAYER_SIZE / 2;
+            
+            camera.x += (targetCamX - camera.x) * VIEWPORT_LAG;
+            camera.y += (targetCamY - camera.y) * VIEWPORT_LAG;
+
+            // Draw Background
+            ctx.fillStyle = '#121212';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.save();
+            ctx.translate(-camera.x, -camera.y);
+
+            // Draw Map Bounds
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 5;
+            ctx.strokeRect(0, 0, MAP_SIZE, MAP_SIZE);
+
+            // Grid lines
+            ctx.strokeStyle = '#222';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            for(let x=0; x<=MAP_SIZE; x+=100) { ctx.moveTo(x, 0); ctx.lineTo(x, MAP_SIZE); }
+            for(let y=0; y<=MAP_SIZE; y+=100) { ctx.moveTo(0, y); ctx.lineTo(MAP_SIZE, y); }
+            ctx.stroke();
+
+            // Draw Obstacles
+            ctx.fillStyle = '#2a2a2a';
+            ctx.shadowColor = 'black';
+            ctx.shadowBlur = 10;
+            for(let obs of mapObstacles) {
+                ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
+                // Highlight edges
+                ctx.strokeStyle = '#444';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(obs.x, obs.y, obs.w, obs.h);
+            }
+            ctx.shadowBlur = 0;
+
+            // Draw Remote Players
+            for(let pid in players) {
+                drawPlayer(ctx, players[pid].currentX, players[pid].currentY, players[pid].colorTop, players[pid].colorBtm, players[pid].name, players[pid].isIt);
+            }
+
+            // Draw Local Player
+            drawPlayer(ctx, localPlayer.x, localPlayer.y, localPlayer.colorTop, localPlayer.colorBtm, localPlayer.name, localPlayer.isIt);
+
+            ctx.restore();
+        }
+
+        function drawPlayer(ctx, x, y, cTop, cBtm, name, isIt) {
+            const size = PLAYER_SIZE;
+            const radius = 12;
+
+            // Glow if IT
+            if(isIt) {
+                ctx.save();
+                ctx.shadowColor = '#fbbf24'; // amber-400
+                ctx.shadowBlur = 20;
+                ctx.fillStyle = 'rgba(251, 191, 36, 0.3)';
+                ctx.beginPath();
+                ctx.arc(x + size/2, y + size/2, size, 0, Math.PI*2);
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // Squircle Shape Clip
+            ctx.save();
+            ctx.beginPath();
+            ctx.roundRect(x, y, size, size, radius);
+            ctx.clip();
+
+            // Top Half
+            ctx.fillStyle = cTop || '#ccc';
+            ctx.fillRect(x, y, size, size/2);
+
+            // Bottom Half
+            ctx.fillStyle = cBtm || '#888';
+            ctx.fillRect(x, y + size/2, size, size/2);
+            
+            ctx.restore();
+
+            // Border (White if normal, Red if IT)
+            ctx.strokeStyle = isIt ? '#fbbf24' : 'rgba(255,255,255,0.2)';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.roundRect(x, y, size, size, radius);
+            ctx.stroke();
+
+            // Eyes (Cute factor)
+            ctx.fillStyle = 'rgba(255,255,255,0.8)';
+            ctx.beginPath();
+            ctx.arc(x + size*0.3, y + size*0.3, 4, 0, Math.PI*2);
+            ctx.arc(x + size*0.7, y + size*0.3, 4, 0, Math.PI*2);
+            ctx.fill();
+
+            // Name Tag
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 12px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(name || 'Player', x + size/2, y - 10);
+            
+            if(isIt) {
+                ctx.fillStyle = '#fbbf24';
+                ctx.font = 'bold 10px sans-serif';
+                ctx.fillText("IT!", x + size/2, y - 24);
+            }
+        }
+
+        function checkRectCollide(x1, y1, w1, h1, x2, y2, w2, h2) {
+            return x1 < x2 + w2 && x1 + w1 > x2 && y1 < y2 + h2 && y1 + h1 > y2;
+        }
+
+        // --- INPUT LISTENERS ---
+        window.addEventListener('keydown', e => { if(keys.hasOwnProperty(e.key)) keys[e.key] = true; });
+        window.addEventListener('keyup', e => { if(keys.hasOwnProperty(e.key)) keys[e.key] = false; });
+
+        // Touch / Joystick
+        const joyZone = document.getElementById('joystick-zone');
+        const joyKnob = document.getElementById('joystick-knob');
+        
+        joyZone.addEventListener('touchstart', e => {
+            e.preventDefault();
+            const touch = e.changedTouches[0];
+            joystick.id = touch.identifier;
+            joystick.active = true;
+            const rect = joyZone.getBoundingClientRect();
+            joystick.originX = rect.left + rect.width/2;
+            joystick.originY = rect.top + rect.height/2;
+            updateJoystick(touch.clientX, touch.clientY);
+        }, {passive: false});
+
+        joyZone.addEventListener('touchmove', e => {
+            e.preventDefault();
+            for(let i=0; i<e.changedTouches.length; i++) {
+                if(e.changedTouches[i].identifier === joystick.id) {
+                    updateJoystick(e.changedTouches[i].clientX, e.changedTouches[i].clientY);
+                    break;
+                }
+            }
+        }, {passive: false});
+
+        const endJoystick = (e) => {
+             for(let i=0; i<e.changedTouches.length; i++) {
+                if(e.changedTouches[i].identifier === joystick.id) {
+                    joystick.active = false;
+                    joystick.dx = 0; 
+                    joystick.dy = 0;
+                    joyKnob.style.transform = `translate(0px, 0px)`;
+                    break;
+                }
+            }
+        };
+        joyZone.addEventListener('touchend', endJoystick);
+        joyZone.addEventListener('touchcancel', endJoystick);
+
+        function updateJoystick(clientX, clientY) {
+            const maxDist = 35;
+            let dx = clientX - joystick.originX;
+            let dy = clientY - joystick.originY;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            
+            if(dist > maxDist) {
+                dx = (dx/dist) * maxDist;
+                dy = (dy/dist) * maxDist;
+            }
+            
+            joystick.dx = dx / maxDist; // -1 to 1
+            joystick.dy = dy / maxDist;
+            
+            joyKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+        }
+
+    </script>
+</body>
+</html>
